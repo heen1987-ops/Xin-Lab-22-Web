@@ -118,11 +118,12 @@ form.inline-form{display:flex;flex-direction:column;gap:10px;background:var(--su
 .event-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .confirm-row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-muted)}
 
-.cat-regular{--cat:#1D4ED8}
+.cat-regular{--cat:#3B82F6}
 .cat-joint{--cat:#0369A1}
 .cat-sponsor{--cat:#DC2626}
 .cat-special{--cat:#991B1B}
 .cat-individual{--cat:#6B7280}
+.cat-degree{--cat:#6B7280}
 .cat-pill{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:color-mix(in srgb, var(--cat) 16%, var(--surface));color:var(--cat)}
 
 .milestone-list{display:flex;flex-direction:column;gap:2px;margin-top:6px;border-top:1px solid var(--border);padding-top:8px}
@@ -186,7 +187,7 @@ form.inline-form{display:flex;flex-direction:column;gap:10px;background:var(--su
 .gantt-year{margin-bottom:16px}
 .gantt-year h3{font-size:14px;font-weight:800;margin-bottom:4px;font-family:"IBM Plex Mono",monospace}
 .gantt-months{display:grid;grid-template-columns:130px repeat(12,1fr);font-size:9.5px;color:var(--text-muted);padding-bottom:3px}
-.gantt-months span{text-align:left}
+.gantt-months span{text-align:left;white-space:nowrap}
 .gantt-row{display:grid;grid-template-columns:130px 1fr;align-items:center;min-height:32px;border-top:1px solid var(--border);gap:6px;cursor:pointer}
 .gantt-row:hover{background:var(--surface-2)}
 .gantt-row .g-label{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -194,6 +195,11 @@ form.inline-form{display:flex;flex-direction:column;gap:10px;background:var(--su
 .gantt-dot{position:absolute;top:50%;left:0;width:10px;height:10px;margin-left:-5px;margin-top:-5px;border-radius:50%;background:var(--cat)}
 .gantt-dot.is-tentative{background:var(--surface);border:2px solid var(--cat);width:8px;height:8px;margin-left:-4px;margin-top:-4px}
 .gantt-dday{position:absolute;top:-13px;left:0;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--cat);white-space:nowrap}
+@media (max-width:480px){
+  .gantt-months{grid-template-columns:64px repeat(12,1fr);font-size:8px}
+  .gantt-row{grid-template-columns:64px 1fr}
+  .gantt-row .g-label{font-size:11px}
+}
 
 .table-wrap{overflow-x:auto}
 table.ledger{width:100%;border-collapse:collapse;font-size:13px}
@@ -303,6 +309,7 @@ var isAdmin = (localStorage.getItem(LS_ADMIN) === "1");
 var showAdminLogin = false;
 var showAddEvent = false, showAddLedger = false, showAddMember = false, showAddDegree = false;
 var showTypesAdmin = false, showAddType = false;
+var showFullTimeline = false;
 var confirmKey = null;
 var namesShown = {};
 var pendingScrollTo = null;
@@ -750,7 +757,7 @@ function renderDegreeCalendar(){
     if (iso === todayStr) cls += " is-today";
     if (ms.length) cls += " has-events";
     if (selectedCalDate === iso) cls += " is-selected";
-    var dots = ms.slice(0,4).map(function(){ return '<span class="cal-dot cat-special"></span>'; }).join('');
+    var dots = ms.slice(0,4).map(function(){ return '<span class="cal-dot cat-degree"></span>'; }).join('');
     return '<div class="'+cls+'"'+(ms.length?(' data-goto-date-degree="'+iso+'"'):'')+'>' +
       '<span class="cal-daynum">'+d+'</span>' +
       (ms.length ? '<span class="cal-dots">'+dots+'</span>' : '') +
@@ -762,7 +769,7 @@ function renderDegreeCalendar(){
     var sel = degreeMilestonesOnDate(selectedCalDate);
     selPanel = '<div class="cal-selected"><div class="small muted">'+fmtDateLine(selectedCalDate)+'</div>' +
       (sel.length ? sel.map(function(m){
-        return '<div class="cal-sel-item"><span class="cat-pill cat-special">'+esc(m.cycle)+'</span><span>'+esc(m.stage)+'</span></div>';
+        return '<div class="cal-sel-item"><span class="cat-pill cat-degree">'+esc(m.cycle)+'</span><span>'+esc(m.stage)+'</span></div>';
       }).join('') : '<div class="small muted">이 날은 등록된 학위 일정이 없어요.</div>') +
     '</div>';
   }
@@ -897,7 +904,7 @@ function renderMilestoneList(ev, type){
 function renderUpcomingMilestones(){
   var items = upcomingMilestones(6);
   if (!items.length) return '';
-  var html = '<div class="section-head"><h2>다가오는 관리포인트</h2></div><div class="card">';
+  var html = '<div class="section-head"><h2>행사 준비 체크리스트</h2></div><div class="card">';
   html += items.map(function(x){
     return '<label class="milestone-row">' +
       (isAdmin ? '<input type="checkbox" data-action="toggle-milestone" data-event="'+x.eventId+'" data-offset="'+x.offset+'">' : '<span class="milestone-dot"></span>') +
@@ -975,6 +982,21 @@ function renderEventDetail(ev){
   html += '</div>';
   return html;
 }
+function dashDegreeCard(m){
+  var dday = daysBetween(todayISO(), m.date);
+  return '<div class="card event-card">' +
+    '<div class="event-top">' +
+      dateBadgeHtml(m.dateConfirmed, m.date) +
+      '<div class="event-info">' +
+        '<div class="event-title-row"><span class="event-title">'+esc(m.stage)+'</span>' +
+          (dday !== null && dday >= 0 ? '<span class="badge badge-admin">'+(dday===0?"D-DAY":"D-"+dday)+'</span>' : '') +
+        '</div>' +
+        '<div class="event-meta">'+esc(m.cycle)+' · '+fmtDateLine(m.date)+'</div>' +
+        (m.memo ? '<div class="event-memo">'+esc(m.memo)+'</div>' : '') +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
 function renderDashboard(){
   if (detailEventId){
     var dev = STATE.events.filter(function(e){ return e.id === detailEventId; })[0];
@@ -1018,25 +1040,24 @@ function renderDashboard(){
     }
   }
 
-  html += '<div class="section-head"><h2>일정 타임라인</h2></div>' + renderGantt();
   html += '<div class="section-head"><h2>다가오는 행사</h2><span class="small muted">'+upcoming.length+'건</span></div>' +
     (upcoming.length ? upcoming.map(dashEventCard).join('')
                      : '<div class="card empty">날짜가 확정된 행사가 없어요.</div>');
 
+  if (isAdmin) html += renderUpcomingMilestones();
+
   var upcomingDegree = upcomingDegreeMilestones(3);
   if (upcomingDegree.length){
-    html += '<div class="section-head"><h2>다가오는 학위 일정</h2>' +
+    html += '<div class="section-head"><h2>학위 일정</h2>' +
       (isAdmin ? '<button type="button" class="btn btn-ghost btn-sm" data-action="goto-admin-degree">학위 캘린더</button>' : '<span class="small muted">행사와 별도 관리</span>') +
     '</div>';
-    html += '<div class="card">' + upcomingDegree.map(function(m){
-      return '<div class="member-row"><span><span class="ledger-memo">'+esc(m.stage)+'</span>' +
-        '<div class="ledger-sub">'+esc(m.cycle)+' · '+fmtDateLine(m.date)+(m.memo?' · '+esc(m.memo):'')+'</div></span>' +
-        '<span class="badge badge-admin">D-'+daysBetween(today, m.date)+'</span>' +
-      '</div>';
-    }).join('') + '</div>';
+    html += upcomingDegree.map(dashDegreeCard).join('');
   }
 
-  if (isAdmin) html += renderUpcomingMilestones();
+  html += '<div class="section-head"><h2>일정 타임라인</h2>' +
+    '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-full-timeline">'+(showFullTimeline?"접기":"전체 일정 보기")+'</button>' +
+  '</div>';
+  html += showFullTimeline ? renderGantt() : '<div class="card empty">전체 2026~2029년 일정을 한눈에 보려면 "전체 일정 보기"를 눌러주세요.</div>';
 
   return html;
 }
@@ -1097,7 +1118,9 @@ function eventCard2(ev){
   var sv = surveyState(ev);
   var namesKey = "names_" + ev.id;
   var mkey = "mile_" + ev.id;
+  var editKey = "editform_" + ev.id;
   var delKey = "ev_" + ev.id;
+  var canEdit = isAdmin && artifactCap && !readOnly;
   var dateLine = ev.dateConfirmed && ev.date ? fmtDateLine(ev.date) : (ev.season || (ev.approxMonth ? (ev.approxMonth+"월경(미정)") : "시기 미정"));
   return '<div class="card event-card" data-event-card="'+ev.id+'">' +
     '<div class="event-top">' +
@@ -1109,14 +1132,15 @@ function eventCard2(ev){
         (ev.memo ? '<div class="event-memo">'+esc(ev.memo)+'</div>' : '') +
       '</div>' +
     '</div>' +
-    (isAdmin && artifactCap && !readOnly ? adminEditForm(ev) : '') +
+    (canEdit && namesShown[editKey] ? adminEditForm(ev) : '') +
     '<div class="pill-row">' +
       rsvpDisplayOptions(ev.id, options).map(function(o){ return '<span class="pill pill-generic">'+esc(o)+' '+counts[o]+'</span>'; }).join('') +
+      (canEdit ? '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-names" data-key="'+editKey+'">'+(namesShown[editKey]?"수정 닫기":"수정")+'</button>' : '') +
       '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-names" data-key="'+namesKey+'">명단</button>' +
       (type && type.milestones.length ? '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-names" data-key="'+mkey+'">체크리스트</button>' : '') +
       (ev.dateConfirmed && ev.date ? '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-names" data-key="cal_'+ev.id+'">캘린더 추가</button>' : '') +
       (ev.place ? '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-names" data-key="map_'+ev.id+'">길안내</button>' : '') +
-      ((ev.infoHtml || (isAdmin && artifactCap && !readOnly)) ? '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-names" data-key="info_'+ev.id+'">안내</button>' : '') +
+      ((ev.infoHtml || canEdit) ? '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-names" data-key="info_'+ev.id+'">안내</button>' : '') +
     '</div>' +
     (namesShown[namesKey] ? ('<div class="small">'+rsvpDisplayOptions(ev.id, options).map(function(o){ return nameGroupWithDelete(o, byOption[o]||[], ev.id); }).join('')+'</div>') : '') +
     (namesShown[mkey] && type ? renderMilestoneList(ev, type) : '') +
@@ -1293,22 +1317,22 @@ function renderTypesAdmin(){
 function renderAdminEvents(){
   var canWrite = isAdmin && artifactCap && !readOnly;
   var html = '<div class="section-head"><h2>행사 관리</h2>' +
-    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' +
       '<div class="seg">' +
         '<button type="button" data-action="view-calendar" class="'+(scheduleView==="calendar"?"is-active":"")+'">캘린더</button>' +
         '<button type="button" data-action="view-list" class="'+(scheduleView==="list"?"is-active":"")+'">목록</button>' +
-        '<button type="button" data-action="view-gantt" class="'+(scheduleView==="gantt"?"is-active":"")+'">로드맵</button>' +
       '</div>' +
-      '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-types-admin">'+(showTypesAdmin?"유형 관리 닫기":"유형(템플릿) 관리")+'</button>' +
-      (canWrite ? '<button type="button" class="btn btn-primary btn-sm" data-action="toggle-add-event">'+(showAddEvent?"닫기":"+ 행사 등록")+'</button>' : '') +
+      '<div style="display:flex;gap:8px">' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-types-admin">'+(showTypesAdmin?"유형 관리 닫기":"유형(템플릿) 관리")+'</button>' +
+        (canWrite ? '<button type="button" class="btn btn-primary btn-sm" data-action="toggle-add-event">'+(showAddEvent?"닫기":"+ 행사 등록")+'</button>' : '') +
+      '</div>' +
     '</div>' +
   '</div>';
-  html += '<p class="small muted">행사를 등록하면 참석 수요조사가 함께 만들어집니다. 응답 마감일을 정하면 그날까지만 응답을 받아요.</p>';
+  html += '<p class="small muted">전체 다년도 일정 흐름은 대시보드의 "일정 타임라인"에서 볼 수 있어요. 여기서는 날짜별 확인(캘린더)과 개별 수정(목록)만 다룹니다.</p>';
   if (!artifactCap) html += writeGate();
   if (showTypesAdmin) html += renderTypesAdmin();
   if (showAddEvent) html += addEventForm();
-  if (scheduleView === "gantt") html += renderGantt();
-  else if (scheduleView === "calendar") html += renderMonthCalendar();
+  if (scheduleView === "calendar") html += renderMonthCalendar();
   else html += renderEventListView();
   return html;
 }
@@ -1628,12 +1652,12 @@ function onRootClick(e){
   if (action === "admin-section"){ adminSection = t.dataset.section; showAddEvent=false; showAddLedger=false; showAddMember=false; showAddDegree=false; confirmKey=null; renderRoot(); return; }
   if (action === "toggle-add-degree"){ showAddDegree = !showAddDegree; renderRoot(); return; }
   if (action === "toggle-types-admin"){ showTypesAdmin = !showTypesAdmin; renderRoot(); return; }
+  if (action === "toggle-full-timeline"){ showFullTimeline = !showFullTimeline; renderRoot(); return; }
   if (action === "toggle-add-type"){ showAddType = !showAddType; renderRoot(); return; }
   if (action === "delete-degree"){ if(!isAdmin) return; removeDegreeMilestone(t.dataset.target); confirmKey=null; renderRoot(); persist(); return; }
   if (action === "toggle-admin-login"){ showAdminLogin = !showAdminLogin; renderRoot(); return; }
   if (action === "admin-logout"){ isAdmin = false; viewMode = "dashboard"; localStorage.removeItem(LS_ADMIN); renderRoot(); return; }
   if (action === "view-calendar"){ scheduleView = "calendar"; renderRoot(); return; }
-  if (action === "view-gantt"){ scheduleView = "gantt"; renderRoot(); return; }
   if (action === "view-list"){ scheduleView = "list"; renderRoot(); return; }
   if (action === "cal-prev"){ calMonth--; if (calMonth < 0){ calMonth = 11; calYear--; } selectedCalDate = null; renderRoot(); return; }
   if (action === "cal-next"){ calMonth++; if (calMonth > 11){ calMonth = 0; calYear++; } selectedCalDate = null; renderRoot(); return; }
